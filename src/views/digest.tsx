@@ -1,4 +1,4 @@
-import type { DigestRow, NightDigest } from '../digest/types.js';
+import type { NightDigest } from '../digest/types.js';
 
 export function Digest({ digest }: { digest: NightDigest }) {
   if (digest.rows.length === 0) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
+import { Hono } from 'hono';
 import { registerDigestPage } from '../src/digest/page-route.js';
 import type { NightDigest, ReadNight } from '../src/digest/types.js';
 
@@ -8,6 +8,17 @@ const config = { adapter: 'shim', installed: '2026-10-29T14:06:00+01:00', beatEv
 const stubDigest: NightDigest = {
   night: '2026-10-28',
   rows: [
+    {
+      job: 'digest/render',
+      owner: null,
+      runs: 1,
+      retries: 0,
+      lastStatus: 'ok',
+      lastError: null,
+      hasFailed: false,
+      firstAt: '2026-10-29T05:41:09+01:00',
+      lastAt: '2026-10-29T05:41:09+01:00',
+    },
     {
       job: 'fixtures/refresh',
       owner: 'rook',
@@ -22,7 +33,7 @@ const stubDigest: NightDigest = {
     {
       job: 'lane/sync',
       owner: 'rook',
-      runs: 7,
+      runs: 8,
       retries: 1,
       lastStatus: 'ok',
       lastError: 'lock held',
@@ -52,19 +63,8 @@ const stubDigest: NightDigest = {
       firstAt: '2026-10-28T23:00:02+01:00',
       lastAt: '2026-10-28T23:00:02+01:00',
     },
-    {
-      job: 'digest/render',
-      owner: null,
-      runs: 1,
-      retries: 0,
-      lastStatus: 'ok',
-      lastError: null,
-      hasFailed: false,
-      firstAt: '2026-10-29T05:41:09+01:00',
-      lastAt: '2026-10-29T05:41:09+01:00',
-    },
   ],
-  counts: { ok: 13, retry: 4, fail: 1 },
+  counts: { ok: 10, retry: 4, fail: 1 },
   invalidLines: 0,
 };
 
@@ -83,7 +83,7 @@ const stubReadNight: ReadNight = (runsDir, night) => {
 
 describe('digest page', () => {
   it('renders a digest with all rows and warnings', async () => {
-    const app = createApp(config);
+    const app = new Hono();
     registerDigestPage(app, config, stubReadNight);
 
     const res = await app.request('/digest/2026-10-28');
@@ -104,18 +104,20 @@ describe('digest page', () => {
   });
 
   it('marks rows with failed or retries >= 3 with warn class', async () => {
-    const app = createApp(config);
+    const app = new Hono();
     registerDigestPage(app, config, stubReadNight);
 
     const res = await app.request('/digest/2026-10-28');
     const html = await res.text();
 
     // fixtures/refresh has retries >= 3, notes/backup has hasFailed
-    expect(html).toContain('class="warn"');
+    expect(html).toContain('<tr class="warn"><td>fixtures/refresh</td>');
+    expect(html).toContain('<tr class="warn"><td>notes/backup</td>');
+    expect(html).toContain('<tr class=""><td>digest/render</td>');
   });
 
   it('returns 404 for missing night', async () => {
-    const app = createApp(config);
+    const app = new Hono();
     registerDigestPage(app, config, stubReadNight);
 
     const res = await app.request('/digest/invalid-night');
@@ -123,7 +125,7 @@ describe('digest page', () => {
   });
 
   it('shows nothing ran for empty digest', async () => {
-    const app = createApp(config);
+    const app = new Hono();
     registerDigestPage(app, config, stubReadNight);
 
     const res = await app.request('/digest/empty');
@@ -134,7 +136,7 @@ describe('digest page', () => {
   });
 
   it('shows invalid lines summary', async () => {
-    const app = createApp(config);
+    const app = new Hono();
     registerDigestPage(app, config, stubReadNight);
 
     const res = await app.request('/digest/invalid');
