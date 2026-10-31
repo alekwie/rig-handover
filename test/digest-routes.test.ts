@@ -161,8 +161,9 @@ describe('digest routes', () => {
       const res = await createApp(config).request('/digest/2026-11-01');
       const html = await res.text();
       expect(res.status).toBe(200);
-      // All-invalid night should still render, no jobs in table
-      expect(html).toContain('<table');
+      // Like an empty file, an all-invalid night has no valid jobs to render.
+      expect(html).toContain('nothing ran');
+      expect(html).toContain('3 invalid lines');
       expect(html).not.toContain('<td>');
     });
 
@@ -178,6 +179,9 @@ describe('digest routes', () => {
       expect(html).not.toContain('<script>');
       expect(html).not.toContain('<img>');
       expect(html).not.toContain('<svg>');
+      expect(html).toContain('job&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(html).toContain('owner&lt;img&gt;');
+      expect(html).toContain('error&lt;svg&gt;');
     });
 
     it('sets LANE_MARKER in environment for banner display', async () => {
