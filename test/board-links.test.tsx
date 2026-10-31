@@ -75,8 +75,8 @@ describe('board links', () => {
     expect(pos2026_10_28).toBeLessThan(pos2026_10_27);
 
     // Verify links to digest pages
-    expect(html).toContain('/digest/2026-10-28');
-    expect(html).toContain('/digest/2026-10-27');
+    expect(html).toContain('href="/digest/2026-10-28"');
+    expect(html).toContain('href="/digest/2026-10-27"');
 
     // Verify exact counts appear with night
     expect(html).toContain('2026-10-28');
