@@ -1,6 +1,6 @@
-import { Hono } from 'hono';
+import type { Hono } from 'hono';
 import type { RigConfig } from '../config.js';
-import type { NightDigest, ReadNight } from './types.js';
+import type { ReadNight } from './types.js';
 
 /**
  * Registers the JSON digest route on the app.
