@@ -24,10 +24,10 @@ export type RunStatus = 'ok' | 'retry' | 'fail';
  * One line of `runs/<night>.jsonl`, as written. The reader counts a line as valid when it parses
  * to a JSON object with:
  * - `at`: a string `Date.parse` reads (not NaN); kept verbatim, offset included
- * - `job`: a non-empty string
+ * - `job`: a non-blank string (kept verbatim)
  * - `status`: a `RunStatus`
- * - `owner`: a string or `null`; missing or empty is read as `null` (missing data is never dropped)
- * - `error`: a string, or absent / `null` for none
+ * - `owner`: a string or `null`; missing or blank is read as `null` (missing data is never dropped)
+ * - `error`: a non-blank string, or absent / `null` / blank for none
  * Other keys are ignored. Lines that are empty after trimming (the final newline, a lone `\r`) are
  * skipped, not counted. Every other line that is not valid counts in `invalidLines`.
  * Every valid line belongs to the night, whatever its date: nights cross midnight.
@@ -84,7 +84,8 @@ export type NightDigest = {
 
 /**
  * Reads `<runsDir>/<night>.jsonl`, synchronously like rig's other file reads.
- * - `null` when the file does not exist, or when `night` does not match /^\d{4}-\d{2}-\d{2}$/
+ * - `null` when the file does not exist, or when `night` is not exactly ten characters matching
+ *   /^\d{4}-\d{2}-\d{2}$/
  *   (then nothing is read, so a night can never point outside `runsDir`).
  * - Otherwise a `NightDigest`. An empty or all-invalid file gives `rows: []`.
  * - Bad lines never throw. Other read errors (e.g. permissions) do.

@@ -124,6 +124,17 @@ describe('rows', () => {
     expect(digest?.counts).toEqual({ ok: 2, retry: 1, fail: 1 });
   });
 
+  it('keeps a blank owner as missing and ignores blank errors and jobs', () => {
+    const digest = readLines(
+      ev({ owner: ' \t ', error: ' \t ' }),
+      ev({ job: ' \t ' }),
+    );
+    expect(digest?.rows).toEqual([
+      expect.objectContaining({ job: 'a/job', owner: null, lastError: null, runs: 1 }),
+    ]);
+    expect(digest?.invalidLines).toBe(1);
+  });
+
   it('orders events by instant, not by file or string order, and keeps each offset verbatim', () => {
     const digest = readLines(
       ev({ at: '2026-10-29T02:45:00+01:00', status: 'ok', owner: 'rook' }), // 01:45Z, latest
@@ -161,6 +172,7 @@ describe('night names', () => {
     mkdirSync(runsDir);
     writeFileSync(join(dir, 'secret.jsonl'), `${ev()}\n`);
     writeFileSync(join(runsDir, `${NIGHT}.jsonl`), `${ev()}\n`);
+    writeFileSync(join(runsDir, `${NIGHT}\n.jsonl`), `${ev()}\n`);
     expect(readNight(runsDir, NIGHT)?.rows).toHaveLength(1);
     for (const night of ['../secret', `../runs/${NIGHT}`, `${NIGHT}/../../secret`, join(dir, 'secret'), `${NIGHT}.jsonl`, `${NIGHT}\n`, ` ${NIGHT}`, '2026-10-3', '20261030', '']) {
       expect(readNight(runsDir, night)).toBeNull();

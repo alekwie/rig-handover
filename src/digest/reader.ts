@@ -7,7 +7,7 @@ import type { DigestRow, ReadNight, RunEvent, StatusCounts } from './types.js';
 const NIGHT = /^\d{4}-\d{2}-\d{2}$/;
 
 export const readNight: ReadNight = (runsDir, night) => {
-  if (!NIGHT.test(night)) return null;
+  if (night.length !== 10 || !NIGHT.test(night)) return null;
   let text: string;
   try {
     text = readFileSync(join(runsDir, `${night}.jsonl`), 'utf8');
@@ -51,12 +51,12 @@ function parseEvent(line: string): RunEvent | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const { at, job, status, owner, error } = value as Record<string, unknown>;
   if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) return null;
-  if (typeof job !== 'string' || job === '') return null;
+  if (typeof job !== 'string' || job.trim() === '') return null;
   if (status !== 'ok' && status !== 'retry' && status !== 'fail') return null;
   if (owner !== undefined && owner !== null && typeof owner !== 'string') return null;
   if (error !== undefined && error !== null && typeof error !== 'string') return null;
-  const event: RunEvent = { at, job, status, owner: owner || null };
-  if (error) event.error = error;
+  const event: RunEvent = { at, job, status, owner: owner?.trim() ? owner : null };
+  if (error?.trim()) event.error = error;
   return event;
 }
 
