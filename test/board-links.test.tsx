@@ -1,81 +1,115 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { readStatus, nightsOnDisk } from '../src/status.js';
+import { describe, expect, it, afterEach } from 'vitest';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Hono } from 'hono';
+import { readStatus } from '../src/status.js';
+import { StatusBoard } from '../src/views/status.js';
 import type { RigConfig } from '../src/config.js';
-import type { ReadNight } from '../src/digest/types.js';
-
-/**
- * Mock readNight for testing: reads the actual test fixture jsonl files and counts.
- */
-const mockReadNight: ReadNight = (runsDir: string, night: string) => {
-  try {
-    const content = readFileSync(`${runsDir}/${night}.jsonl`, 'utf8');
-    let ok = 0,
-      retry = 0,
-      fail = 0;
-    content.split('\n').forEach((line) => {
-      if (!line.trim()) return;
-      try {
-        const event = JSON.parse(line);
-        if (event.status === 'ok') ok++;
-        else if (event.status === 'retry') retry++;
-        else if (event.status === 'fail') fail++;
-      } catch {
-        // skip invalid lines
-      }
-    });
-    return { night, rows: [], counts: { ok, retry, fail }, invalidLines: 0 };
-  } catch {
-    return null;
-  }
-};
+import type { ReadNight, NightDigest } from '../src/digest/types.js';
 
 describe('board links', () => {
-  it('lists nights on disk with counts', () => {
-    const config: RigConfig = {
-      adapter: 'shim',
-      installed: '2026-10-29T14:06:00+01:00',
-      beatEverySeconds: 60,
-      runsDir: 'runs',
-    };
-    const status = readStatus(config, mockReadNight);
+  let runsDir: string;
 
-    expect(status.nights).toHaveLength(2);
-    expect(status.nights[0].night).toBe('2026-10-28');
-    expect(status.nights[0].counts).toEqual({ ok: expect.any(Number), retry: expect.any(Number), fail: expect.any(Number) });
-    expect(status.nights[1].night).toBe('2026-10-27');
+  // Create temp runs dir with fixture files
+  const setupFixtures = () => {
+    runsDir = mkdtempSync(join(tmpdir(), 'rig-runs-'));
+    // 2026-10-28 has 10 ok, 4 retry, 1 fail
+    writeFileSync(join(runsDir, '2026-10-28.jsonl'), '');
+    // 2026-10-27 has 7 ok, 0 retry, 0 fail
+    writeFileSync(join(runsDir, '2026-10-27.jsonl'), '');
+  };
+
+  const cleanup = () => {
+    if (runsDir) {
+      rmSync(runsDir, { recursive: true, force: true });
+    }
+  };
+
+  afterEach(() => {
+    cleanup();
   });
 
-  it('shows counts beside each link in newest-first order', () => {
+  /**
+   * Typed ReadNight stub that returns known counts without parsing.
+   * Maps fixture filenames to expected counts from the real data.
+   */
+  const stubReadNight: ReadNight = (runsDir: string, night: string): NightDigest | null => {
+    const knownCounts: Record<string, { ok: number; retry: number; fail: number }> = {
+      '2026-10-28': { ok: 10, retry: 4, fail: 1 },
+      '2026-10-27': { ok: 7, retry: 0, fail: 0 },
+    };
+
+    const counts = knownCounts[night];
+    if (!counts) return null;
+
+    return {
+      night,
+      rows: [],
+      counts,
+      invalidLines: 0,
+    };
+  };
+
+  it('renders links to digest pages with correct counts in newest-first order', async () => {
+    setupFixtures();
     const config: RigConfig = {
       adapter: 'shim',
       installed: '2026-10-29T14:06:00+01:00',
       beatEverySeconds: 60,
-      runsDir: 'runs',
+      runsDir,
     };
-    const status = readStatus(config, mockReadNight);
 
-    // Verify newest first
-    const nights = status.nights.map((n) => n.night);
-    expect(nights).toEqual(['2026-10-28', '2026-10-27']);
+    const status = readStatus(config, stubReadNight);
+
+    // Create a tiny Hono route to render the board
+    const app = new Hono();
+    app.get('/', (c) => c.html(<StatusBoard status={status} />));
+
+    const res = await app.request('/');
+    const html = await res.text();
+
+    // Verify newest-first order
+    const pos2026_10_28 = html.indexOf('2026-10-28');
+    const pos2026_10_27 = html.indexOf('2026-10-27');
+    expect(pos2026_10_28).toBeLessThan(pos2026_10_27);
+
+    // Verify links to digest pages
+    expect(html).toContain('/digest/2026-10-28');
+    expect(html).toContain('/digest/2026-10-27');
+
+    // Verify exact counts appear with night
+    expect(html).toContain('2026-10-28');
+    expect(html).toMatch(/2026-10-28.*ok 10.*retry 4.*fail 1/s);
+
+    expect(html).toContain('2026-10-27');
+    expect(html).toMatch(/2026-10-27.*ok 7.*retry 0.*fail 0/s);
   });
 
-  it('returns zeroed counts when a night disappears (race condition)', () => {
+  it('returns zeroed counts when readNight returns null (race condition)', async () => {
+    setupFixtures();
     const config: RigConfig = {
       adapter: 'shim',
       installed: '2026-10-29T14:06:00+01:00',
       beatEverySeconds: 60,
-      runsDir: 'runs',
+      runsDir,
     };
 
-    // Mock that returns null (file not found)
+    // Stub that always returns null
     const nullReadNight: ReadNight = () => null;
     const status = readStatus(config, nullReadNight);
 
-    // Should still list the nights from disk, but with zeroed counts
-    expect(status.nights).toHaveLength(2);
-    status.nights.forEach((entry) => {
-      expect(entry.counts).toEqual({ ok: 0, retry: 0, fail: 0 });
-    });
+    // Create a tiny Hono route to render the board
+    const app = new Hono();
+    app.get('/', (c) => c.html(<StatusBoard status={status} />));
+
+    const res = await app.request('/');
+    const html = await res.text();
+
+    // Should still list nights, but with zeroed counts
+    expect(html).toContain('2026-10-28');
+    expect(html).toContain('2026-10-27');
+    expect(html).toMatch(/2026-10-28.*ok 0.*retry 0.*fail 0/s);
+    expect(html).toMatch(/2026-10-27.*ok 0.*retry 0.*fail 0/s);
   });
 });
