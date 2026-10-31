@@ -1,8 +1,9 @@
 ---
 plan: morning-digest
-status: ready
+status: done
 owner: rook
 opened: 2026-10-29
+closed: 2026-10-31
 ---
 
 # Morning digest
@@ -77,3 +78,36 @@ page again with `LANE_MARKER` unset (the banner reads "no marker set") and uploa
 link. Move this plan to `docs/plans/done/` with its issue list.
 
 Done when: the preview link no longer shows the lane marker.
+
+## Issues
+
+| Issue | Source | Work | Blocked by |
+|---|---|---|---|
+| [#1](https://github.com/alekwie/rig-handover/issues/1) | § 1 | Shared types and reader contract | — |
+| [#2](https://github.com/alekwie/rig-handover/issues/2) | § 1 | Run log reader | #1 |
+| [#3](https://github.com/alekwie/rig-handover/issues/3) | § 2a | Digest page | #1 |
+| [#4](https://github.com/alekwie/rig-handover/issues/4) | § 2b | Digest JSON | #1 |
+| [#5](https://github.com/alekwie/rig-handover/issues/5) | § 2c | Board links and counts | #1 |
+| [#6](https://github.com/alekwie/rig-handover/issues/6) | § 2d | Route tests | #1; final checks need #2–#4 |
+| [#7](https://github.com/alekwie/rig-handover/issues/7) | § 3 | Public preview and review | #2–#6 |
+| [#8](https://github.com/alekwie/rig-handover/issues/8) | § 4 | Marker cleanup and plan archival | #7, actual review and separate human approval |
+
+The issue closing comments record worker, model, effort and commit. Shared types landed
+before the reader and four section-2 workers started. Types and reader used
+claude-opus-5-5; the four section-2 workers used claude-haiku-4-5.
+
+## Completion record
+
+- All 53 tests and strict typechecking pass. Independent checks confirm both sample
+  nights' page/JSON job ordering and unchanged `runs/` fixtures.
+- The reviewer confirmed it had seen the marked preview before cleanup.
+- After separate human approval, rig ran with `LANE_MARKER` unset and its self-contained
+  digest was captured again through an HTTP command.
+- The clean capture replaced https://alekwie.github.io/rig-handover/ at the exact same URL.
+  HTTP 200/text/html and exact bytes were verified; the banner reads "no marker set" and
+  the original marker is absent.
+- Neither HTML capture nor the marker entered git. The Pages workflow used temporary
+  encrypted input and a deletable deployment artifact; the uploader removed both after
+  successful publication. The sample page remains public without its marker.
+- The tested upload, overwrite and take-down routine lives in the shared
+  `.agents/skills/github-pages-preview/SKILL.md`.
