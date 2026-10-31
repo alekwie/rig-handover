@@ -1,0 +1,56 @@
+name: Public HTML preview
+run-name: Preview upload ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: Non-secret upload identifier
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: public-html-preview
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # The HTML never enters git or workflow inputs. Do not print the secret.
+      - name: Restore approved HTML from temporary secret
+        env:
+          PREVIEW_HTML_B64: ${{ secrets.RIG_PREVIEW_HTML_B64 }}
+        run: |
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          html = base64.b64decode(os.environ["PREVIEW_HTML_B64"], validate=True)
+          if not html.lower().startswith(b"<!doctype html>"):
+              raise SystemExit("Expected a self-contained HTML capture")
+          site = Path(os.environ["RUNNER_TEMP"]) / "rig-preview"
+          site.mkdir(mode=0o700)
+          (site / "index.html").write_bytes(html)
+          PY
+      - name: Package short-lived Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ${{ runner.temp }}/rig-preview
+          retention-days: 1
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Remove runner copy
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/rig-preview"
